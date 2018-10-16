@@ -21,9 +21,11 @@ app.set('port', port);
  */
 
 const options = {
+
     key: fs.readFileSync('key.pem'),
     cert: fs.readFileSync('cert.pem'),
     passphrase: '75XLGnUo'
+
 };
 //TODO: После добавления SSL отвалятся тесты PowerShell.
 
