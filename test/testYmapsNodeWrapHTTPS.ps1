@@ -18,12 +18,12 @@ foreach ($pointFrom in $pointsFromArray){
         $responseObj = $request.GetResponse()
         $responseStreamObj = $responseObj.GetResponseStream()
 
-        $responseStream = New-Object System.IO.StreamReader($responseStreamObj) 
-  
+        $responseStream = New-Object System.IO.StreamReader($responseStreamObj)
+
         $responseStr = $responseStream.ReadToEnd()
 
         Write-Host $responseStr
- 
+
         $responseObj.Close()
         $responseStreamObj.Close()
    
