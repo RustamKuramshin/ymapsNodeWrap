@@ -1,4 +1,9 @@
 node_modules
 npm-debug.log
+test
+build.sh
+README.md
 .idea
 .git
+.gitignore
+.dockerignore
