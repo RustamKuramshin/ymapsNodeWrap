@@ -4,8 +4,8 @@ const puppeteer = require('puppeteer');
 const path = require('path');
 var async = require('async');
 
-var route = {length: 0};
-var outputValue = '0';
+var route = {};
+var outputValue = 0;
 var browser, page;
 
 (async ()=>{
@@ -14,12 +14,23 @@ var browser, page;
     page = await browser.newPage();
     const htmlWrapPath = path.join(path.dirname(__dirname), 'html_wrap');
     await page.goto('file:///' + path.join(htmlWrapPath, 'apiWrap.html'));
+    await page.evaluate(yandexApiKey => {
+
+        var scriptElement = document.createElement('script');
+        if(yandexApiKey === undefined){
+            scriptElement.src = "https://api-maps.yandex.ru/2.1/?lang=ru_RU";
+        }else{
+            scriptElement.src = "https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=" + yandexApiKey;
+        }
+        document.body.appendChild(scriptElement);
+
+    }, process.env.YANDEXAPIKEY);
 
 })();
 
 router.get('/', function (req, res, next) {
 
-    if (req.query.apikey !== 'IQTCgkwwGXEIGNtwka6J3li5xg2G8Ds1'){
+    if (req.query.apikey !== process.env.ACCESSAPIKEY){
         res.send({});
         return;
     }
@@ -31,15 +42,9 @@ router.get('/', function (req, res, next) {
                 page.evaluate(
                     //Будет выполнено в контексте страницы+
                     evaluateArg => {
-                        document.getElementById('map').innerHTML = "";
-                        document.getElementById('outputValue').innerHTML = '0';
 
-                        /*var myMap = new ymaps.Map("map", {
-                            center: [55.76, 37.64],
-                            zoom: 7
-                        });*/
+                        window.outputValue = 0;
 
-                        //Обработка запроса
                         var points = [];
                         var re = /^\d{1,3}\.\d+,\d{1,3}\.\d+$/;
 
@@ -48,38 +53,28 @@ router.get('/', function (req, res, next) {
                         var arrayQuery = strQuery.split('|');
 
                         for (i = 0; i < arrayQuery.length; i++ ) {
-
                             points[i] = {type:'wayPoint', point:''};
-
                             if(re.test(arrayQuery[i])){
                                 points[i].point = arrayQuery[i].split(',');
                             } else {
                                 points[i].point = arrayQuery[i];
                             }
                         }
-                        //
 
                         ymaps.route(points, {
                             mapStateAutoApply: true,
                             routingMode : 'auto'
                         }).then(function (route) {
-                            /*route.getPaths().options.set({
-                                balloonContentLayout: ymaps.templateLayoutFactory.createClass('{{ properties.humanJamsTime }}'),
-                                strokeColor: '0000ffff',
-                                opacity: 0.9
-                            });*/
-
-                            document.getElementById('outputValue').innerHTML = route.getLength();
-
-                            /*yMap.geoObjects.add(route);*/
+                            window.outputValue = route.getLength();
                         });
+
                     }, strQuery
                     //Будет выполнено в контексте страницы-
                 );
                 callback(null, '');
             },
             function(callback) {
-                outputValue = '0';
+                outputValue = 0;
 
                 callback(null, '');
             }
@@ -87,22 +82,22 @@ router.get('/', function (req, res, next) {
 
         function(err, results) {
             async.whilst(
-                function() { return outputValue === '0';
+                function() { return outputValue === 0;
                 },
                 function(callback) {
 
                     setTimeout(function() {
 
                         page.evaluate(
-                            ()=>{return document.getElementById('outputValue').innerHTML}
+                            ()=>{return window.outputValue}
                         ).then((returnedValue)=>{outputValue = returnedValue;});
 
-                        callback(null, 'stub');
+                        callback(null, '');
 
                     }, 100);
                 },
                 function (err, stub) {
-                    route.length= outputValue;
+                    route.length = outputValue;
                     res.send(route);
                 }
             );

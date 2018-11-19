@@ -5,13 +5,13 @@ var debug = require('debug')('headless-ymaps:server');
 var https = require('https');
 const fs = require('fs');
 
-var port = normalizePort(process.env.PORT || '8080');
+var port = normalizePort(process.env.PORT);
 app.set('port', port);
 
 const options = {
     key: fs.readFileSync('key.pem'),
     cert: fs.readFileSync('cert.pem'),
-    passphrase: '75XLGnUo'
+    passphrase: process.env.PASSPHRASE
 };
 
 var server = https.createServer(options, app);

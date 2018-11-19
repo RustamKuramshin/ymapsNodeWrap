@@ -1,4 +1,11 @@
-﻿Clear-Host
+﻿
+Param (
+    [string]$Server,
+    [string]$Port
+)
+
+
+Clear-Host
 
 $pointsFromArray = '55.811511,37.312518','Ростов-на-Дону','Батайск','Абаза','Арзамас','Белозерск','Беслан','Буйнакск'
 $pointsToArray = 'Краснодар','Азов','Кемерово','Абакан','Аксай','Барнаул','Волжск'
@@ -9,7 +16,7 @@ foreach ($pointFrom in $pointsFromArray){
 
     foreach ($pointTo in $pointsToArray){
 
-        $res = Invoke-WebRequest -Uri ('https://localhost:8080/route?apikey=IQTCgkwwGXEIGNtwka6J3li5xg2G8Ds1&waypoints=' + $pointFrom + '|' + $pointTo)
+        $res = Invoke-WebRequest -Uri ('https://'+$Server+':'+$Port+'/route?apikey=IQTCgkwwGXEIGNtwka6J3li5xg2G8Ds1&waypoints=' + $pointFrom + '|' + $pointTo)
         Write-Host $res.Content
     
     }
