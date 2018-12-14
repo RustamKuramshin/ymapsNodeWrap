@@ -1,4 +1,12 @@
 /node_modules/
 env.list
-
+.idea
+*.iml
 *.pem
+out
+gen
+.idea/inspectionProfiles/
+.idea/misc.xml
+.idea/modules.xml
+.idea/webdevinterview.iml
+.idea/workspace.xml
