@@ -14,7 +14,6 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 app.use('/route', routeRouter);
-
 app.use(function(req, res, next) {
   next(createError(404));
 });
