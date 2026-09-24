@@ -1,107 +1,57 @@
-var express = require('express');
-var router = express.Router();
-const puppeteer = require('puppeteer');
-const path = require('path');
-var async = require('async');
+const crypto = require('crypto');
+const express = require('express');
+const ymaps = require('../lib/ymaps');
+const { parseWaypoints } = require('../lib/waypoints');
 
-var route = {};
-var outputValue = 0;
-var browser, page;
+const router = express.Router();
 
-(async ()=>{
+const DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
-    browser = await puppeteer.launch({args: ['--no-sandbox', '--disable-setuid-sandbox']});
-    page = await browser.newPage();
-    const htmlWrapPath = path.join(path.dirname(__dirname), 'html_wrap');
-    await page.goto('file:///' + path.join(htmlWrapPath, 'apiWrap.html'));
-    await page.evaluate(yandexApiKey => {
+function routeTimeout() {
+    const value = parseInt(process.env.ROUTE_TIMEOUT_MS, 10);
+    return value > 0 ? value : DEFAULT_ROUTE_TIMEOUT_MS;
+}
 
-        var scriptElement = document.createElement('script');
-        if(yandexApiKey === undefined){
-            scriptElement.src = "https://api-maps.yandex.ru/2.1/?lang=ru_RU";
-        }else{
-            scriptElement.src = "https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=" + yandexApiKey;
-        }
-        document.body.appendChild(scriptElement);
+// Сравнение за постоянное время, чтобы не подсказывать ключ по времени ответа.
+function isAuthorized(apikey) {
+    const expected = process.env.ACCESSAPIKEY;
+    if (!expected || typeof apikey !== 'string') {
+        return false;
+    }
+    const hash = value => crypto.createHash('sha256').update(value).digest();
+    return crypto.timingSafeEqual(hash(apikey), hash(expected));
+}
 
-    }, process.env.YANDEXAPIKEY);
-
-})();
-
-router.get('/', function (req, res, next) {
-
-    if (req.query.apikey !== process.env.ACCESSAPIKEY){
-        res.send({});
+router.get('/', async function (req, res) {
+    if (!isAuthorized(req.query.apikey)) {
+        res.status(401).send({ error: 'Неверный ключ доступа' });
         return;
     }
 
-    var strQuery = JSON.stringify(req.query);
+    let points;
+    try {
+        points = parseWaypoints(req.query.waypoints);
+    } catch (err) {
+        res.status(400).send({ error: err.message });
+        return;
+    }
 
-    async.series([
-        function(callback) {
-                page.evaluate(
-                    //Будет выполнено в контексте страницы+
-                    evaluateArg => {
+    let result;
+    try {
+        result = await ymaps.getRouteLength(points, routeTimeout());
+    } catch (err) {
+        console.error(err);
+        res.status(503).send({ error: 'API Карт недоступно' });
+        return;
+    }
 
-                        window.outputValue = 0;
-
-                        var points = [];
-                        var re = /^\d{1,3}\.\d+,\d{1,3}\.\d+$/;
-
-                        var jsonQuery = JSON.parse(evaluateArg);
-                        var strQuery = jsonQuery['waypoints'];
-                        var arrayQuery = strQuery.split('|');
-
-                        for (i = 0; i < arrayQuery.length; i++ ) {
-                            points[i] = {type:'wayPoint', point:''};
-                            if(re.test(arrayQuery[i])){
-                                points[i].point = arrayQuery[i].split(',');
-                            } else {
-                                points[i].point = arrayQuery[i];
-                            }
-                        }
-
-                        ymaps.route(points, {
-                            mapStateAutoApply: true,
-                            routingMode : 'auto'
-                        }).then(function (route) {
-                            window.outputValue = route.getLength();
-                        });
-
-                    }, strQuery
-                    //Будет выполнено в контексте страницы-
-                );
-                callback(null, '');
-            },
-            function(callback) {
-                outputValue = 0;
-
-                callback(null, '');
-            }
-        ],
-
-        function(err, results) {
-            async.whilst(
-                function() { return outputValue === 0;
-                },
-                function(callback) {
-
-                    setTimeout(function() {
-
-                        page.evaluate(
-                            ()=>{return window.outputValue}
-                        ).then((returnedValue)=>{outputValue = returnedValue;});
-
-                        callback(null, '');
-
-                    }, 100);
-                },
-                function (err, stub) {
-                    route.length = outputValue;
-                    res.send(route);
-                }
-            );
-        });
+    if (result.ok) {
+        res.send({ length: result.length });
+    } else if (result.reason === 'timeout') {
+        res.status(504).send({ error: result.message });
+    } else {
+        res.status(422).send({ error: result.message });
+    }
 });
 
 module.exports = router;

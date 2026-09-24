@@ -1,23 +1,22 @@
-FROM node:8
-
-RUN apt-get update && apt-get install -yq libgconf-2-4
-
-RUN apt-get update && apt-get install -y wget --no-install-recommends \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
-    && apt-get update \
-    && apt-get install -y google-chrome-unstable fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst ttf-freefont \
-      --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get purge --auto-remove -y curl \
-    && rm -rf /src/*.deb
+FROM node:22-bookworm-slim
 
 WORKDIR /app
 
+ENV NODE_ENV=production \
+    PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
+
 COPY package*.json ./
 
-RUN npm install
+# Chrome нужной версии скачивает сам puppeteer, системные библиотеки для него ставит --install-deps.
+RUN npm ci --omit=dev \
+    && npx puppeteer browsers install chrome --install-deps \
+    && rm -rf /var/lib/apt/lists/* /root/.npm
 
 COPY . .
+
+RUN useradd --create-home app && chown -R app:app /app/.cache
+USER app
+
+EXPOSE 8080
 
 CMD [ "node", "./bin/www" ]

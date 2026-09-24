@@ -8,3 +8,5 @@ README.md
 .gitignore
 .dockerignore
 env.list
+*.pem
+.cache
