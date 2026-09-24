@@ -45,6 +45,13 @@ function request(query) {
     }));
 }
 
+test('health готов после загрузки API Карт, ключ не нужен', async () => {
+    await ymaps.getPage();
+    const res = await fetch(baseUrl + '/health');
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(await res.json(), { status: 'ok' });
+});
+
 test('без ключа доступа - 401', async () => {
     const res = await request({ waypoints: 'Азов|Аксай' });
     assert.strictEqual(res.status, 401);

@@ -1,0 +1,17 @@
+services:
+  ymaps:
+    build: .
+    image: nodedev/ymapsnode
+    # Chrome for Testing собирается только под amd64, на ARM (Apple Silicon) образ работает через эмуляцию.
+    platform: linux/amd64
+    env_file: env.list
+    environment:
+      # Внутри контейнера порт всегда 8080, внешний задаётся HOST_PORT.
+      PORT: "8080"
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    # Для HTTPS раскомментируйте и выдайте права на чтение ключа uid 1000 (chown 1000 key.pem).
+    # volumes:
+    #   - ./key.pem:/app/key.pem:ro
+    #   - ./cert.pem:/app/cert.pem:ro
+    restart: unless-stopped

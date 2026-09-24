@@ -2,6 +2,7 @@ var express = require('express');
 var logger = require('morgan');
 
 var routeRouter = require('./routes/route');
+var ymaps = require('./lib/ymaps');
 
 var app = express();
 
@@ -13,6 +14,17 @@ logger.token('safe-url', function (req) {
 app.use(logger(':method :safe-url :status :response-time ms - :res[content-length]'));
 
 app.use('/route', routeRouter);
+
+// Готовность к работе: браузер запущен и API Карт загружено.
+app.get('/health', function(req, res) {
+  if (ymaps.isReady()) {
+    res.send({ status: 'ok' });
+    return;
+  }
+  ymaps.getPage().catch(function () {});
+  res.status(503).send({ status: 'starting' });
+});
+
 app.use(function(req, res) {
   res.status(404).send({ error: 'Не найдено' });
 });

@@ -1,12 +1,9 @@
-node_modules
-npm-debug.log
-test
-build.sh
-README.md
-.idea
-.git
-.gitignore
-.dockerignore
-env.list
-*.pem
-.cache
+# В контекст сборки попадает только то, что нужно образу.
+*
+!package.json
+!package-lock.json
+!app.js
+!bin
+!lib
+!routes
+!html_wrap

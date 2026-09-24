@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 
-docker build -t nodedev/ymapsnode .
+# Дополнительные аргументы передаются docker build как есть.
+docker build --platform linux/amd64 -t nodedev/ymapsnode "$@" .

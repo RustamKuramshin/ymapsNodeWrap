@@ -25,6 +25,8 @@ GET https://server_ip:port/route?apikey=<secret_code>&waypoints=<point_1|point_2
 | 503 | `{"error": "..."}` | API Карт не загрузилось |
 | 504 | `{"error": "..."}` | маршрут не построен за `ROUTE_TIMEOUT_MS` |
 
+`GET /health` (без ключа) возвращает 200 `{"status": "ok"}`, когда браузер запущен и API Карт загружено, иначе 503 и повторную попытку загрузки.
+
 ## Настройка
 
 Переменные окружения (шаблон в `env.list.example`):
@@ -41,7 +43,7 @@ GET https://server_ip:port/route?apikey=<secret_code>&waypoints=<point_1|point_2
 
 ## Запуск
 
-Нужен Node.js 22.12 или новее.
+Нужен Node.js 22.12 или новее (в Docker используется Node 24).
 
 ```
 npm install
@@ -55,11 +57,42 @@ npm start
 ## Docker
 
 ```
-./build.sh
-docker run --env-file env.list -p 8080:8080 -v "$PWD/key.pem:/app/key.pem:ro" -v "$PWD/cert.pem:/app/cert.pem:ro" nodedev/ymapsnode
+cp env.list.example env.list   # заполнить значения
+docker compose up -d --build
 ```
 
-Сертификаты в образ не копируются, их нужно подключать томами.
+Сервис будет доступен на порту 8080, другой внешний порт задаётся переменной `HOST_PORT` (`HOST_PORT=9090 docker compose up -d`). Без compose:
+
+```
+./build.sh
+docker run -d --env-file env.list -e PORT=8080 -p 8080:8080 nodedev/ymapsnode
+```
+
+Как устроен образ:
+
+- сборка в три этапа: зависимости Node, скачивание `chrome-headless-shell` той версии, под которую выпущен puppeteer, итоговый образ на Ubuntu 24.04 только с нужными библиотеками (около 270 МБ в сжатом виде);
+- процесс работает от непривилегированного пользователя `ubuntu` (uid 1000), `tini` передаёт сигналы и завершает дочерние процессы Chrome;
+- `HEALTHCHECK` опрашивает `/health`, состояние видно в `docker ps`;
+- Chrome for Testing выпускается только под amd64, поэтому `build.sh` и compose собирают образ под `linux/amd64`; на Apple Silicon он работает через эмуляцию.
+
+Для HTTPS ключ и сертификат подключаются томами (в образ они не копируются), а ключ должен быть доступен на чтение uid 1000:
+
+```
+chown 1000 key.pem
+docker run -d --env-file env.list -e PORT=8080 -p 8080:8080 \
+  -v "$PWD/key.pem:/app/key.pem:ro" -v "$PWD/cert.pem:/app/cert.pem:ro" nodedev/ymapsnode
+```
+
+Если сеть подменяет TLS-сертификаты (корпоративный прокси), этапам сборки с `npm` нужен корневой сертификат прокси. Проще всего подготовить базовый образ с ним и подставить его без правки Dockerfile:
+
+```
+# в отдельной папке ca-base/ лежат proxy-ca.crt и Dockerfile:
+#   FROM node:24-bookworm-slim
+#   COPY proxy-ca.crt /ca.crt
+#   ENV NODE_EXTRA_CA_CERTS=/ca.crt
+docker build -t local/node24-ca ca-base/
+./build.sh --build-context node:24-bookworm-slim=docker-image://local/node24-ca
+```
 
 ## Тесты
 
