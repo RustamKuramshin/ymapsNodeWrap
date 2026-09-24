@@ -1,0 +1,28 @@
+#!/usr/bin/env node
+
+// Проверка для HEALTHCHECK в Docker: код 0, если сервис готов строить маршруты.
+
+var http = require('http');
+var https = require('https');
+var tls = require('../lib/tls');
+
+var useTls = tls.isTlsEnabled();
+var client = useTls ? https : http;
+
+var req = client.get({
+  host: '127.0.0.1',
+  port: process.env.PORT || 8080,
+  path: '/health',
+  timeout: 4000,
+  rejectUnauthorized: false
+}, function (res) {
+  res.resume();
+  process.exit(res.statusCode === 200 ? 0 : 1);
+});
+
+req.on('timeout', function () {
+  req.destroy();
+});
+req.on('error', function () {
+  process.exit(1);
+});

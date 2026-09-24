@@ -2,10 +2,10 @@
 
 var app = require('../app');
 var ymaps = require('../lib/ymaps');
+var tls = require('../lib/tls');
 var debug = require('debug')('headless-ymaps:server');
 var http = require('http');
 var https = require('https');
-const fs = require('fs');
 
 if (!process.env.ACCESSAPIKEY) {
   console.error('Не задана переменная окружения ACCESSAPIKEY');
@@ -31,18 +31,20 @@ process.on('SIGINT', shutdown);
 
 // HTTPS, если есть ключ и сертификат, иначе HTTP.
 function createServer() {
-  var keyPath = process.env.TLS_KEY || 'key.pem';
-  var certPath = process.env.TLS_CERT || 'cert.pem';
-
-  if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
-    return https.createServer({
-      key: fs.readFileSync(keyPath),
-      cert: fs.readFileSync(certPath),
-      passphrase: process.env.PASSPHRASE
-    }, app);
+  if (tls.isTlsEnabled()) {
+    try {
+      return https.createServer(tls.tlsOptions(), app);
+    } catch (err) {
+      console.error('Не удалось загрузить TLS-ключ или сертификат (' + err.code + '): ' + err.message);
+      if (err.code === 'EACCES') {
+        console.error('Процесс работает от uid ' + process.getuid() + ', у него должно быть право на чтение файлов');
+      }
+      process.exit(1);
+    }
   }
 
-  console.warn('Файлы ' + keyPath + ' и ' + certPath + ' не найдены, сервер работает по HTTP');
+  var paths = tls.tlsPaths();
+  console.warn('Файлы ' + paths.key + ' и ' + paths.cert + ' не найдены, сервер работает по HTTP');
   return http.createServer(app);
 }
 
