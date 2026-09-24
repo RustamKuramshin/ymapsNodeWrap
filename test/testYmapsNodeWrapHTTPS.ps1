@@ -1,7 +1,10 @@
-﻿
+﻿# Нагрузочная проверка сервиса, запущенного по HTTPS (самоподписанный сертификат допускается).
+# Пример: .\testYmapsNodeWrapHTTPS.ps1 -Server localhost -Port 8080 -ApiKey <ACCESSAPIKEY>
+
 Param (
-[string]$Server,
-[string]$Port
+    [Parameter(Mandatory=$true)][string]$Server,
+    [Parameter(Mandatory=$true)][string]$Port,
+    [Parameter(Mandatory=$true)][string]$ApiKey
 )
 
 Clear-Host
@@ -24,25 +27,30 @@ foreach ($pointFrom in $pointsFromArray){
 
     foreach ($pointTo in $pointsToArray){
 
-        $url = "https://" + $Server + ":" + $Port + "/route?apikey=IQTCgkwwGXEIGNtwka6J3li5xg2G8Ds1&waypoints="+ $pointFrom + "|" + $pointTo
+        $waypoints = [uri]::EscapeDataString($pointFrom + '|' + $pointTo)
+        $url = 'https://' + $Server + ':' + $Port + '/route?apikey=' + [uri]::EscapeDataString($ApiKey) + '&waypoints=' + $waypoints
 
         $request = [System.Net.HttpWebRequest]::CreateHttp($url)
         $request.Method = 'GET'
         $request.ServerCertificateValidationCallback = {$true}
 
-        $responseObj = $request.GetResponse()
-        $responseStreamObj = $responseObj.GetResponseStream()
+        try {
+            $responseObj = $request.GetResponse()
+        } catch [System.Net.WebException] {
+            $responseObj = $_.Exception.Response
+            if ($responseObj -eq $null) {
+                Write-Host $pointFrom '->' $pointTo ':' $_.Exception.Message
+                continue
+            }
+        }
 
-        $responseStream = New-Object System.IO.StreamReader($responseStreamObj)
+        $responseStream = New-Object System.IO.StreamReader($responseObj.GetResponseStream())
+        Write-Host $responseStream.ReadToEnd()
 
-        $responseStr = $responseStream.ReadToEnd()
-
-        Write-Host $responseStr
-
+        $responseStream.Close()
         $responseObj.Close()
-        $responseStreamObj.Close()
-   
-   }
+
+    }
 }
 
 Write-Host 'End load test'

@@ -1,9 +1,11 @@
-﻿
-Param (
-    [string]$Server,
-    [string]$Port
-)
+﻿# Нагрузочная проверка сервиса, запущенного по HTTP (без key.pem и cert.pem).
+# Пример: .\testYmapsNodeWrapHTTP.ps1 -Server localhost -Port 8080 -ApiKey <ACCESSAPIKEY>
 
+Param (
+    [Parameter(Mandatory=$true)][string]$Server,
+    [Parameter(Mandatory=$true)][string]$Port,
+    [Parameter(Mandatory=$true)][string]$ApiKey
+)
 
 Clear-Host
 
@@ -16,9 +18,16 @@ foreach ($pointFrom in $pointsFromArray){
 
     foreach ($pointTo in $pointsToArray){
 
-        $res = Invoke-WebRequest -Uri ('https://'+$Server+':'+$Port+'/route?apikey=IQTCgkwwGXEIGNtwka6J3li5xg2G8Ds1&waypoints=' + $pointFrom + '|' + $pointTo)
-        Write-Host $res.Content
-    
+        $waypoints = [uri]::EscapeDataString($pointFrom + '|' + $pointTo)
+        $url = 'http://' + $Server + ':' + $Port + '/route?apikey=' + [uri]::EscapeDataString($ApiKey) + '&waypoints=' + $waypoints
+
+        try {
+            $res = Invoke-WebRequest -UseBasicParsing -Uri $url
+            Write-Host $res.Content
+        } catch {
+            Write-Host $pointFrom '->' $pointTo ':' $_.Exception.Message
+        }
+
     }
 
 }
